@@ -1,0 +1,143 @@
+<html>
+<head>
+<title>Web Music Sketchpad</title>
+<style>
+  body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; }
+  .controls { margin-bottom: 20px; }
+  .note-grid {
+    display: grid;
+    grid-template-columns: repeat(16, 40px);
+    grid-template-rows: repeat(8, 40px);
+    gap: 2px;
+    border: 1px solid #ccc;
+  }
+  .note-cell {
+    background-color: #eee;
+    cursor: pointer;
+    border: 1px solid #ddd;
+  }
+  .note-cell.active {
+    background-color: #4CAF50;
+  }
+  button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<h1>Web Music Sketchpad</h1>
+
+<div class="controls">
+  <label for="instrument">Instrument:</label>
+  <select id="instrument">
+    <option value="sine">Sine Wave</option>
+    <option value="square">Square Wave</option>
+    <option value="sawtooth">Sawtooth Wave</option>
+    <option value="triangle">Triangle Wave</option>
+  </select>
+  <label for="tempo">Tempo (BPM):</label>
+  <input type="number" id="tempo" value="120" min="30" max="300">
+  <button id="playButton">Play</button>
+  <button id="clearButton">Clear</button>
+</div>
+
+<div class="note-grid" id="noteGrid"></div>
+
+<script>
+  const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  const instrumentSelect = document.getElementById('instrument');
+  const tempoInput = document.getElementById('tempo');
+  const playButton = document.getElementById('playButton');
+  const clearButton = document.getElementById('clearButton');
+  const noteGrid = document.getElementById('noteGrid');
+
+  const numSteps = 16; // Number of columns (time steps)
+  const numNotes = 8;  // Number of rows (different pitches)
+  const baseFrequency = 261.63; // Middle C (C4)
+  const noteFrequencies = [
+    baseFrequency * Math.pow(2, 2/12), // D4
+    baseFrequency * Math.pow(2, 4/12), // E4
+    baseFrequency * Math.pow(2, 5/12), // F4
+    baseFrequency * Math.pow(2, 7/12), // G4
+    baseFrequency * Math.pow(2, 9/12), // A4
+    baseFrequency * Math.pow(2, 11/12), // B4
+    baseFrequency * Math.pow(2, 12/12), // C5
+    baseFrequency * Math.pow(2, 14/12)  // D5
+  ].reverse(); // Reverse to have lower notes at the bottom
+
+  let gridState = Array(numNotes).fill(0).map(() => Array(numSteps).fill(false));
+
+  // Create the grid cells
+  for (let row = 0; row < numNotes; row++) {
+    for (let col = 0; col < numSteps; col++) {
+      const cell = document.createElement('div');
+      cell.classList.add('note-cell');
+      cell.dataset.row = row;
+      cell.dataset.col = col;
+      cell.addEventListener('click', () => {
+        gridState[row][col] = !gridState[row][col];
+        cell.classList.toggle('active');
+      });
+      noteGrid.appendChild(cell);
+    }
+  }
+
+  // Function to play a note
+  function playNote(frequency, duration, type) {
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    oscillator.type = type;
+    oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+
+    gainNode.gain.setValueAtTime(0.5, audioContext.currentTime); // Volume
+    gainNode.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + duration);
+
+    oscillator.start();
+    setTimeout(() => oscillator.stop(), duration * 1000);
+  }
+
+  // Playback logic
+  playButton.addEventListener('click', () => {
+    const tempo = parseInt(tempoInput.value);
+    const stepDuration = 60 / tempo;
+    const instrumentType = instrumentSelect.value;
+
+    let currentStep = 0;
+    const intervalId = setInterval(() => {
+      if (currentStep >= numSteps) {
+        clearInterval(intervalId);
+        return;
+      }
+
+      // Highlight current step
+      document.querySelectorAll('.note-cell').forEach(cell => {
+        if (parseInt(cell.dataset.col) === currentStep) {
+          cell.style.border = '2px solid blue';
+        } else {
+          cell.style.border = '1px solid #ddd';
+        }
+      });
+
+      for (let row = 0; row < numNotes; row++) {
+        if (gridState[row][currentStep]) {
+          playNote(noteFrequencies[row], stepDuration, instrumentType);
+        }
+      }
+      currentStep++;
+    }, stepDuration * 1000);
+  });
+
+  // Clear grid
+  clearButton.addEventListener('click', () => {
+    gridState = Array(numNotes).fill(0).map(() => Array(numSteps).fill(false));
+    document.querySelectorAll('.note-cell').forEach(cell => cell.classList.remove('active'));
+    document.querySelectorAll('.note-cell').forEach(cell => cell.style.border = '1px solid #ddd');
+  });
+
+</script>
+
+</body>
+</html>
